@@ -35,7 +35,21 @@ const App: React.FC = () => {
 
     // Find the latest week that has started
     const validWeeks = TRAINING_WEEKS.filter(w => w.startDate);
-    const currentWeek = [...validWeeks].reverse().find(w => w.startDate! <= todayStr);
+    
+    // Logic update: The week label switches on MONDAY, not Sunday.
+    // Sunday is considered the deadline for the previous week's homework.
+    // We look for a week where startDate is strictly BEFORE today (startDate < today).
+    // Example: Week 1 starts 2/1 (Sun).
+    // On 2/1: 2/1 < 2/1 is False. It falls back to OT (User wants "OT period" until 2/1).
+    // On 2/2: 2/1 < 2/2 is True. It becomes Week 1.
+    let currentWeek = [...validWeeks].reverse().find(w => w.startDate! < todayStr);
+    
+    // Edge case: The very first day of training (e.g., 1/25 OT Start).
+    // On 1/25: 1/25 < 1/25 is false, so it returns null.
+    // We must explicitly allow the first day to show the first week.
+    if (!currentWeek && validWeeks.length > 0 && validWeeks[0].startDate === todayStr) {
+      currentWeek = validWeeks[0];
+    }
     
     return currentWeek ? currentWeek.label.split('(')[0].trim() : null;
   }, []);
