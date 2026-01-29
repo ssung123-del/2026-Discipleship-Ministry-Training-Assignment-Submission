@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Header } from './components/Header';
 import { StatusModal } from './components/StatusModal';
 import { TRAINING_WEEKS, MAX_FILE_SIZE_MB, GOOGLE_SCRIPT_URL } from './constants';
 import { TraineeSubmission, UploadStatus, FeedbackResponse } from './types';
-import { UploadCloud, File as FileIcon, User, Calendar, X, AlertTriangle } from 'lucide-react';
+import { UploadCloud, File as FileIcon, User, Calendar, X, AlertTriangle, Clock } from 'lucide-react';
 
 const App: React.FC = () => {
   const [submission, setSubmission] = useState<TraineeSubmission>({
@@ -13,6 +13,93 @@ const App: React.FC = () => {
   });
   const [status, setStatus] = useState<UploadStatus>(UploadStatus.IDLE);
   const [feedback, setFeedback] = useState<FeedbackResponse | null>(null);
+
+  // --- Calculate Current Week ---
+  const currentWeekLabel = useMemo(() => {
+    const today = new Date();
+    // Format: YYYY-MM-DD
+    const todayStr = today.toISOString().split('T')[0];
+
+    // Find the latest week that has started
+    const validWeeks = TRAINING_WEEKS.filter(w => w.startDate);
+    const currentWeek = [...validWeeks].reverse().find(w => w.startDate! <= todayStr);
+    
+    return currentWeek ? currentWeek.label.split('(')[0].trim() : null;
+  }, []);
+
+  // --- Image Compression Utility ---
+  const compressImage = async (file: File): Promise<File> => {
+    // Only compress images
+    if (!file.type.startsWith('image/')) {
+      return file;
+    }
+
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const reader = new FileReader();
+
+      reader.onload = (e) => {
+        img.src = e.target?.result as string;
+      };
+      
+      reader.onerror = (e) => reject(e);
+
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        // Max dimension
+        const MAX_DIMENSION = 1600;
+
+        if (width > height) {
+          if (width > MAX_DIMENSION) {
+            height *= MAX_DIMENSION / width;
+            width = MAX_DIMENSION;
+          }
+        } else {
+          if (height > MAX_DIMENSION) {
+            width *= MAX_DIMENSION / height;
+            height = MAX_DIMENSION;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(file); // Fallback to original if context fails
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Compress to JPEG with 0.7 quality
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], file.name, {
+                type: 'image/jpeg',
+                lastModified: Date.now(),
+              });
+              if (compressedFile.size > file.size) {
+                resolve(file);
+              } else {
+                resolve(compressedFile);
+              }
+            } else {
+              resolve(file); // Fallback
+            }
+          },
+          'image/jpeg',
+          0.7
+        );
+      };
+
+      reader.readAsDataURL(file);
+    });
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -125,22 +212,31 @@ const App: React.FC = () => {
     try {
       const weekLabel = TRAINING_WEEKS.find(w => w.id === submission.weekId)?.label || 'Unknown';
       
-      for (const file of submission.files) {
-        const base64Data = await fileToBase64(file);
+      // Use Promise.all to upload concurrently and apply compression
+      const uploadPromises = submission.files.map(async (originalFile) => {
+        // 1. Compress Image (if it's an image)
+        const fileToUpload = await compressImage(originalFile);
         
-        await fetch(GOOGLE_SCRIPT_URL, {
+        // 2. Convert to Base64
+        const base64Data = await fileToBase64(fileToUpload);
+        
+        // 3. Upload
+        return fetch(GOOGLE_SCRIPT_URL, {
           method: 'POST',
           mode: 'no-cors',
           headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify({
             name: submission.name,
             week: weekLabel,
-            fileName: file.name,
-            mimeType: file.type,
+            fileName: originalFile.name, // Use original name
+            mimeType: fileToUpload.type,
             fileData: base64Data
           })
         });
-      }
+      });
+
+      // Wait for all uploads to finish
+      await Promise.all(uploadPromises);
 
       const fileCount = submission.files.length;
       const fileNames = submission.files.map(f => f.name).join(', ');
@@ -169,62 +265,90 @@ const App: React.FC = () => {
     setFeedback(null);
   };
 
+  // Group weeks by section
+  const weeksBySection = TRAINING_WEEKS.reduce((acc, week) => {
+    const section = week.section || '기타';
+    if (!acc[section]) acc[section] = [];
+    acc[section].push(week);
+    return acc;
+  }, {} as Record<string, typeof TRAINING_WEEKS>);
+
   const isFormValid = submission.name.length > 0 && submission.weekId.length > 0 && submission.files.length > 0;
 
   return (
     <div className="min-h-screen bg-slate-100 pb-20">
       <Header />
 
-      <main className="max-w-2xl mx-auto px-4 mt-8">
-        <div className="bg-white rounded-3xl shadow-xl border-2 border-slate-200 p-6 md:p-10">
-          <div className="mb-10 text-center">
-             <h2 className="text-3xl font-bold text-gray-900">과제 제출하기</h2>
-             <p className="text-lg text-slate-600 mt-3 font-medium">이름과 주차를 선택 후 파일을 올려주세요.</p>
+      <main className="max-w-xl mx-auto px-4 mt-6">
+        
+        <div className="bg-white rounded-2xl shadow-lg border-2 border-slate-200 p-5 md:p-8">
+          <div className="mb-8 text-center">
+             <h2 className="text-2xl font-bold text-gray-900">과제 제출하기</h2>
+             <p className="text-base text-slate-600 mt-2 font-medium">이름과 주차를 선택 후 파일을 올려주세요.</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-10">
+          <form onSubmit={handleSubmit} className="space-y-8">
             {/* Step 1: Identity */}
-            <div className="space-y-3">
-              <label className="block text-xl font-bold text-gray-900">
+            <div className="space-y-2">
+              <label className="block text-lg font-bold text-gray-900">
                 1. 성함이 어떻게 되시나요?
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-blue-600">
-                  <User size={28} />
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-blue-600">
+                  <User size={22} />
                 </div>
                 <input
                   type="text"
                   value={submission.name}
                   onChange={(e) => setSubmission({ ...submission, name: e.target.value })}
                   placeholder="예: 홍길동"
-                  className="w-full pl-14 pr-6 py-5 rounded-2xl border-2 border-slate-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 transition-all outline-none bg-white text-xl text-gray-900 placeholder-slate-400 shadow-sm"
+                  className="w-full pl-11 pr-4 py-3.5 rounded-xl border-2 border-slate-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 transition-all outline-none bg-white text-lg text-gray-900 placeholder-slate-400 shadow-sm"
                 />
               </div>
             </div>
 
             {/* Step 2: Context */}
-            <div className="space-y-3">
-              <label className="block text-xl font-bold text-gray-900">
+            <div className="space-y-2">
+              <label className="block text-lg font-bold text-gray-900">
                 2. 몇 주차 과제인가요?
               </label>
+              
+              {/* Current Week Indicator */}
+              <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 flex items-center text-blue-800 mb-1.5">
+                <Clock size={18} className="mr-2 text-blue-600 shrink-0" />
+                <span className="font-medium text-sm md:text-base">
+                   {currentWeekLabel ? (
+                     <>이번 주는 <span className="font-bold">{currentWeekLabel}</span> 기간입니다.</>
+                   ) : (
+                     <span>현재는 훈련 기간이 아닙니다.</span>
+                   )}
+                </span>
+              </div>
+
               <div className="relative">
-                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-blue-600">
-                  <Calendar size={28} />
+                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-blue-600">
+                  <Calendar size={22} />
                 </div>
                 <select
                   value={submission.weekId}
                   onChange={(e) => setSubmission({ ...submission, weekId: e.target.value })}
-                  className="w-full pl-14 pr-10 py-5 rounded-2xl border-2 border-slate-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 transition-all outline-none bg-white text-xl text-gray-900 appearance-none cursor-pointer shadow-sm"
+                  className="w-full pl-11 pr-10 py-3.5 rounded-xl border-2 border-slate-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 transition-all outline-none bg-white text-lg text-gray-900 appearance-none cursor-pointer shadow-sm"
                 >
                   <option value="" disabled className="text-slate-400">눌러서 주차를 선택하세요</option>
-                  {TRAINING_WEEKS.map((week) => (
-                    <option key={week.id} value={week.id} className="py-2">
-                      {week.label}
-                    </option>
+                  
+                  {Object.entries(weeksBySection).map(([section, weeks]) => (
+                    <optgroup key={section} label={section} className="font-bold text-slate-900 bg-slate-50">
+                      {weeks.map((week) => (
+                        <option key={week.id} value={week.id} className="py-2 bg-white font-normal text-gray-900">
+                          {week.label} {week.topic ? `- ${week.topic}` : ''}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
+                  
                 </select>
                 <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-slate-500">
-                  <svg className="h-6 w-6 fill-current" viewBox="0 0 20 20">
+                  <svg className="h-5 w-5 fill-current" viewBox="0 0 20 20">
                     <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
                   </svg>
                 </div>
@@ -232,10 +356,12 @@ const App: React.FC = () => {
             </div>
 
             {/* Step 3: File */}
-            <div className="space-y-3">
-              <label className="block text-xl font-bold text-gray-900">
+            <div className="space-y-2">
+              <label className="block text-lg font-bold text-gray-900">
                 3. 과제 파일을 올려주세요
-                <span className="block text-base font-normal text-slate-500 mt-1">여러 개를 한 번에 올리셔도 됩니다.</span>
+                <span className="block text-sm font-normal text-slate-500 mt-1">
+                  D형큐티, 설교나눔(수요,금요), 독후감 등을 업로드해주세요.
+                </span>
               </label>
               
               <div
@@ -243,7 +369,7 @@ const App: React.FC = () => {
                 onDrop={handleDrop}
                 className="relative group cursor-pointer"
               >
-                <div className="border-3 border-dashed border-slate-400 rounded-3xl p-10 text-center transition-all bg-slate-50 group-hover:bg-blue-50 group-hover:border-blue-500">
+                <div className="border-3 border-dashed border-slate-400 rounded-2xl p-8 text-center transition-all bg-slate-50 group-hover:bg-blue-50 group-hover:border-blue-500">
                   <input
                     type="file"
                     multiple
@@ -251,15 +377,15 @@ const App: React.FC = () => {
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                     accept="image/*,.pdf,.doc,.docx,.hwp"
                   />
-                  <div className="flex flex-col items-center justify-center space-y-4">
-                    <div className="p-5 bg-white rounded-full shadow-md text-blue-600 group-hover:scale-110 transition-transform duration-300">
-                      <UploadCloud size={48} />
+                  <div className="flex flex-col items-center justify-center space-y-3">
+                    <div className="p-4 bg-white rounded-full shadow-md text-blue-600 group-hover:scale-110 transition-transform duration-300">
+                      <UploadCloud size={40} />
                     </div>
-                    <div className="space-y-2">
-                      <p className="text-xl font-bold text-slate-800">
+                    <div className="space-y-1">
+                      <p className="text-lg font-bold text-slate-800">
                         여기를 눌러서 파일을 선택하세요
                       </p>
-                      <p className="text-base text-slate-500">
+                      <p className="text-sm text-slate-500">
                         사진, PDF, 한글, 워드 파일 가능
                       </p>
                     </div>
@@ -269,19 +395,19 @@ const App: React.FC = () => {
 
               {/* File List */}
               {submission.files.length > 0 && (
-                <div className="space-y-3 mt-6">
-                  <p className="text-lg font-bold text-blue-800 px-1">선택된 파일 목록 ({submission.files.length}개):</p>
+                <div className="space-y-2 mt-4">
+                  <p className="text-base font-bold text-blue-800 px-1">선택된 파일 목록 ({submission.files.length}개):</p>
                   {submission.files.map((file, index) => (
-                    <div key={`${file.name}-${file.lastModified}-${index}`} className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-4 flex items-center justify-between shadow-sm">
-                      <div className="flex items-center space-x-4 overflow-hidden">
-                        <div className="bg-white p-3 rounded-xl text-blue-600 shadow-sm shrink-0">
-                          <FileIcon size={28} />
+                    <div key={`${file.name}-${file.lastModified}-${index}`} className="bg-blue-50 border-2 border-blue-200 rounded-xl p-3 flex items-center justify-between shadow-sm">
+                      <div className="flex items-center space-x-3 overflow-hidden">
+                        <div className="bg-white p-2 rounded-lg text-blue-600 shadow-sm shrink-0">
+                          <FileIcon size={20} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-lg font-bold text-gray-900 truncate">
+                          <p className="text-base font-bold text-gray-900 truncate">
                             {file.name}
                           </p>
-                          <p className="text-sm text-slate-600 font-medium">
+                          <p className="text-xs text-slate-600 font-medium">
                             {(file.size / 1024 / 1024).toFixed(2)} MB
                           </p>
                         </div>
@@ -289,10 +415,10 @@ const App: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => removeFile(index)}
-                        className="p-3 bg-white border border-red-100 hover:bg-red-50 text-red-500 rounded-xl transition-colors shadow-sm"
+                        className="p-2 bg-white border border-red-100 hover:bg-red-50 text-red-500 rounded-lg transition-colors shadow-sm"
                         aria-label="파일 삭제"
                       >
-                        <X size={24} />
+                        <X size={18} />
                       </button>
                     </div>
                   ))}
@@ -302,10 +428,10 @@ const App: React.FC = () => {
 
             {/* Admin Configuration Warning */}
             {!GOOGLE_SCRIPT_URL && (
-              <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-6 flex items-start space-x-4">
-                <AlertTriangle className="text-amber-600 shrink-0 mt-1" size={32} />
-                <div className="text-base text-amber-900">
-                  <p className="font-bold text-lg mb-2">관리자 설정 필요</p>
+              <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-4 flex items-start space-x-3">
+                <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={24} />
+                <div className="text-sm text-amber-900">
+                  <p className="font-bold mb-1">관리자 설정 필요</p>
                   <p>
                     구글 드라이브 주소가 설정되지 않았습니다. 관리자에게 문의하세요.
                   </p>
@@ -313,11 +439,11 @@ const App: React.FC = () => {
               </div>
             )}
 
-            <div className="pt-4">
+            <div className="pt-2">
               <button
                 type="submit"
                 disabled={!isFormValid || !GOOGLE_SCRIPT_URL}
-                className={`w-full py-5 rounded-2xl font-bold text-2xl shadow-xl transition-all duration-300 ${
+                className={`w-full py-4 rounded-xl font-bold text-xl shadow-lg transition-all duration-300 ${
                   isFormValid && GOOGLE_SCRIPT_URL
                     ? 'bg-blue-600 text-white hover:bg-blue-700 hover:scale-[1.01]'
                     : 'bg-slate-300 text-slate-500 cursor-not-allowed'
