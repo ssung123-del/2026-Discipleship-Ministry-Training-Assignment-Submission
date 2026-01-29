@@ -1,0 +1,5 @@
+{
+  "name": "Discipleship Training Portal",
+  "description": "A portal for trainees to submit homework, automatically organized by name and week, with AI-powered encouragement.",
+  "requestFramePermissions": []
+}
