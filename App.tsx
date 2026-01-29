@@ -1,9 +1,19 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Header } from './components/Header';
 import { StatusModal } from './components/StatusModal';
 import { TRAINING_WEEKS, MAX_FILE_SIZE_MB, GOOGLE_SCRIPT_URL } from './constants';
 import { TraineeSubmission, UploadStatus, FeedbackResponse } from './types';
 import { UploadCloud, File as FileIcon, User, Calendar, X, AlertTriangle, Clock } from 'lucide-react';
+
+// Recommended encouragement messages list
+const ENCOURAGEMENT_MESSAGES = [
+  "바쁜 일상 속에서도 훈련의 자리를 지키시는 모습이 정말 아름답습니다.",
+  "성실한 훈련이 믿음의 단단한 뿌리가 될 것입니다. 끝까지 응원합니다!",
+  "오늘도 주님과 동행하며 승리하는 하루 보내시길 기도합니다.",
+  "제출하신 과제를 통해 하나님을 더 깊이 알아가시길 소망합니다.",
+  "수고 많으셨습니다! 남은 한 주도 주님의 은혜 안에 평안하세요.",
+  "작은 순종이 모여 큰 기적을 이룹니다. 훈련생님을 축복합니다!"
+];
 
 const App: React.FC = () => {
   const [submission, setSubmission] = useState<TraineeSubmission>({
@@ -13,11 +23,14 @@ const App: React.FC = () => {
   });
   const [status, setStatus] = useState<UploadStatus>(UploadStatus.IDLE);
   const [feedback, setFeedback] = useState<FeedbackResponse | null>(null);
+  const [progress, setProgress] = useState<number>(0);
+
+  // Use refs to track progress across async operations
+  const progressMapRef = useRef<number[]>([]);
 
   // --- Calculate Current Week ---
   const currentWeekLabel = useMemo(() => {
     const today = new Date();
-    // Format: YYYY-MM-DD
     const todayStr = today.toISOString().split('T')[0];
 
     // Find the latest week that has started
@@ -29,7 +42,6 @@ const App: React.FC = () => {
 
   // --- Image Compression Utility ---
   const compressImage = async (file: File): Promise<File> => {
-    // Only compress images
     if (!file.type.startsWith('image/')) {
       return file;
     }
@@ -49,7 +61,6 @@ const App: React.FC = () => {
         let width = img.width;
         let height = img.height;
 
-        // Max dimension
         const MAX_DIMENSION = 1600;
 
         if (width > height) {
@@ -69,13 +80,12 @@ const App: React.FC = () => {
 
         const ctx = canvas.getContext('2d');
         if (!ctx) {
-          resolve(file); // Fallback to original if context fails
+          resolve(file);
           return;
         }
 
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Compress to JPEG with 0.7 quality
         canvas.toBlob(
           (blob) => {
             if (blob) {
@@ -89,7 +99,7 @@ const App: React.FC = () => {
                 resolve(compressedFile);
               }
             } else {
-              resolve(file); // Fallback
+              resolve(file);
             }
           },
           'image/jpeg',
@@ -107,13 +117,11 @@ const App: React.FC = () => {
       const validFiles: File[] = [];
 
       newFiles.forEach(file => {
-        // 1. Size Check
         if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
           alert(`'${file.name}' 파일 크기가 ${MAX_FILE_SIZE_MB}MB를 초과하여 제외되었습니다.`);
           return;
         }
 
-        // 2. Duplicate Check
         const isDuplicate = submission.files.some(existing => 
           existing.name === file.name && 
           existing.size === file.size && 
@@ -147,13 +155,11 @@ const App: React.FC = () => {
       const validFiles: File[] = [];
 
       newFiles.forEach(file => {
-        // 1. Size Check
         if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
            alert(`'${file.name}' 파일 크기가 ${MAX_FILE_SIZE_MB}MB를 초과하여 제외되었습니다.`);
            return;
         }
 
-        // 2. Duplicate Check
         const isDuplicate = submission.files.some(existing => 
           existing.name === file.name && 
           existing.size === file.size && 
@@ -198,6 +204,11 @@ const App: React.FC = () => {
     });
   };
 
+  const getRandomEncouragement = () => {
+    const randomIndex = Math.floor(Math.random() * ENCOURAGEMENT_MESSAGES.length);
+    return ENCOURAGEMENT_MESSAGES[randomIndex];
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!submission.name || !submission.weekId || submission.files.length === 0) return;
@@ -208,33 +219,75 @@ const App: React.FC = () => {
     }
 
     setStatus(UploadStatus.UPLOADING);
+    setProgress(0);
+    
+    // Initialize progress tracking
+    progressMapRef.current = new Array(submission.files.length).fill(0);
+    const totalOriginalSize = submission.files.reduce((acc, f) => acc + f.size, 0);
+
+    const updateWeightedProgress = () => {
+      const totalUploaded = progressMapRef.current.reduce((acc, fraction, idx) => {
+        return acc + (fraction * submission.files[idx].size);
+      }, 0);
+      const percentage = totalOriginalSize > 0 
+        ? Math.min(100, Math.round((totalUploaded / totalOriginalSize) * 100))
+        : 0;
+      setProgress(percentage);
+    };
 
     try {
       const weekLabel = TRAINING_WEEKS.find(w => w.id === submission.weekId)?.label || 'Unknown';
       
-      // IMPORTANT: Upload files sequentially (one by one) instead of in parallel.
-      // Parallel uploads (Promise.all) cause a race condition on the Google Apps Script side,
-      // leading to duplicate folders being created (e.g., two "Name" folders).
-      for (const originalFile of submission.files) {
-        // 1. Compress Image (if it's an image)
+      const uploadSingleFile = async (originalFile: File, index: number) => {
+        // 1. Compress Image
         const fileToUpload = await compressImage(originalFile);
         
         // 2. Convert to Base64
         const base64Data = await fileToBase64(fileToUpload);
         
-        // 3. Upload
-        await fetch(GOOGLE_SCRIPT_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({
-            name: submission.name,
-            week: weekLabel,
-            fileName: originalFile.name, // Use original name
-            mimeType: fileToUpload.type,
-            fileData: base64Data
-          })
-        });
+        // --- Progress Simulation Start ---
+        const SIMULATED_SPEED_BYTES_PER_MS = 500 * 1024 / 1000; // 0.5 MB/s
+        const estimatedDurationMs = Math.max(1500, fileToUpload.size / SIMULATED_SPEED_BYTES_PER_MS);
+        const startTime = Date.now();
+        
+        const progressInterval = setInterval(() => {
+          const elapsed = Date.now() - startTime;
+          const simulatedFraction = Math.min(0.9, elapsed / estimatedDurationMs);
+          
+          progressMapRef.current[index] = simulatedFraction;
+          updateWeightedProgress();
+        }, 200);
+
+        try {
+          // 3. Upload (fetch no-cors)
+          await fetch(GOOGLE_SCRIPT_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({
+              name: submission.name,
+              week: weekLabel,
+              fileName: originalFile.name,
+              mimeType: fileToUpload.type,
+              fileData: base64Data
+            })
+          });
+        } finally {
+          clearInterval(progressInterval);
+          progressMapRef.current[index] = 1.0;
+          updateWeightedProgress();
+        }
+      };
+
+      // 1. Upload the FIRST file sequentially to ensure folder creation.
+      if (submission.files.length > 0) {
+        await uploadSingleFile(submission.files[0], 0);
+      }
+
+      // 2. Upload ALL remaining files in PARALLEL.
+      if (submission.files.length > 1) {
+        const remainingFiles = submission.files.slice(1);
+        await Promise.all(remainingFiles.map((file, i) => uploadSingleFile(file, i + 1)));
       }
 
       const fileCount = submission.files.length;
@@ -242,9 +295,10 @@ const App: React.FC = () => {
       
       setFeedback({
         message: fileCount === 1 ? fileNames : `${submission.files[0].name} 외 ${fileCount - 1}건`,
-        encouragement: "수고하셨습니다! 훈련을 통해 더욱 성장하시길 축복합니다."
+        encouragement: getRandomEncouragement()
       });
       setStatus(UploadStatus.SUCCESS);
+      setProgress(100);
 
     } catch (error) {
       console.error("Upload Failed:", error);
@@ -256,15 +310,16 @@ const App: React.FC = () => {
     setSubmission({ name: '', weekId: '', files: [] });
     setStatus(UploadStatus.IDLE);
     setFeedback(null);
+    setProgress(0);
   };
 
   const resetFilesOnly = () => {
     setSubmission(prev => ({ ...prev, files: [] }));
     setStatus(UploadStatus.IDLE);
     setFeedback(null);
+    setProgress(0);
   };
 
-  // Group weeks by section
   const weeksBySection = TRAINING_WEEKS.reduce((acc, week) => {
     const section = week.section || '기타';
     if (!acc[section]) acc[section] = [];
@@ -313,7 +368,6 @@ const App: React.FC = () => {
                 2. 몇 주차 과제인가요?
               </label>
               
-              {/* Current Week Indicator */}
               <div className="bg-blue-50 border border-blue-100 rounded-lg p-2.5 flex items-center text-blue-800 mb-1.5">
                 <Clock size={16} className="mr-2 text-blue-600 shrink-0" />
                 <span className="font-medium text-sm">
@@ -460,6 +514,7 @@ const App: React.FC = () => {
         status={status}
         feedback={feedback}
         files={submission.files}
+        progress={progress}
         onReset={resetFormFull}
         onContinue={resetFilesOnly}
       />

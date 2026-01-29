@@ -6,11 +6,12 @@ interface StatusModalProps {
   status: UploadStatus;
   feedback: FeedbackResponse | null;
   files?: File[];
+  progress: number;
   onReset: () => void; // Completely reset (Close)
   onContinue: () => void; // Keep info, clear files (Upload More)
 }
 
-export const StatusModal: React.FC<StatusModalProps> = ({ status, feedback, files, onReset, onContinue }) => {
+export const StatusModal: React.FC<StatusModalProps> = ({ status, feedback, files, progress, onReset, onContinue }) => {
   if (status === UploadStatus.IDLE) return null;
 
   return (
@@ -20,15 +21,29 @@ export const StatusModal: React.FC<StatusModalProps> = ({ status, feedback, file
         {/* Loading State */}
         {(status === UploadStatus.UPLOADING || status === UploadStatus.ANALYZING) && (
           <div className="text-center py-10">
-            <div className="relative mx-auto w-24 h-24 mb-8">
+            <div className="relative mx-auto w-24 h-24 mb-6">
                <div className="absolute inset-0 border-8 border-slate-100 rounded-full"></div>
                <div className="absolute inset-0 border-8 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
                <Loader2 className="absolute inset-0 m-auto text-blue-600 animate-pulse" size={40} />
             </div>
-            <h3 className="text-3xl font-bold text-gray-900 mb-4">
+            <h3 className="text-3xl font-bold text-gray-900 mb-2">
               파일을 올리고 있습니다
             </h3>
-            <p className="text-xl text-slate-600">화면을 닫지 말고 잠시만 기다려주세요.</p>
+            
+            {/* Progress Bar */}
+            <div className="w-full max-w-xs mx-auto mt-6 mb-2">
+              <div className="flex justify-between mb-1">
+                 <span className="text-base font-medium text-blue-700">{progress}%</span>
+              </div>
+              <div className="w-full bg-slate-200 rounded-full h-2.5">
+                <div 
+                  className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out" 
+                  style={{ width: `${progress}%` }}
+                ></div>
+              </div>
+            </div>
+
+            <p className="text-lg text-slate-500 mt-4">잠시만 기다려주세요.</p>
           </div>
         )}
 
