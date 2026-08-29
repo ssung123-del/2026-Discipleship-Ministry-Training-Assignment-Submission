@@ -3,7 +3,7 @@ import { Header } from './components/Header';
 import { StatusModal } from './components/StatusModal';
 import { TRAINING_WEEKS, MAX_FILE_SIZE_MB, GOOGLE_SCRIPT_URL } from './constants';
 import { TraineeSubmission, UploadStatus, FeedbackResponse } from './types';
-import { UploadCloud, File as FileIcon, User, X, AlertTriangle, Clock, ListChecks, BookOpen } from 'lucide-react';
+import { UploadCloud, File as FileIcon, User, X, AlertTriangle, Clock, ListChecks } from 'lucide-react';
 
 // Recommended encouragement messages list
 const ENCOURAGEMENT_MESSAGES = [
@@ -513,19 +513,6 @@ const App: React.FC = () => {
                                   </li>
                                 ))}
                               </ul>
-                            )}
-                            {week.memoryVerse && (
-                              <div className="mt-3 rounded-lg border border-blue-200 bg-white p-3">
-                                <div className="flex items-center gap-2 text-blue-800">
-                                  <BookOpen size={16} className="shrink-0" />
-                                  <p className="text-sm font-bold">암송구절: {week.memoryVerse.reference}</p>
-                                </div>
-                                {week.memoryVerse.text && (
-                                  <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-700">
-                                    {week.memoryVerse.text}
-                                  </p>
-                                )}
-                              </div>
                             )}
                           </div>
                         ))}

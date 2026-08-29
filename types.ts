@@ -16,10 +16,6 @@ export interface WeekOption {
   label: string;
   topic?: string;
   assignmentItems?: string[];
-  memoryVerse?: {
-    reference: string;
-    text?: string;
-  };
   section?: string; // Grouping (e.g., 1권, 2권)
   startDate?: string; // YYYY-MM-DD format for date comparison
 }
