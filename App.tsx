@@ -28,10 +28,8 @@ const getCommonAssignmentItems = (section?: string) => {
     '새벽기도: 주 4회 이상 참석',
     '주만나 QT: 주 5회 이상',
     '교재 예습',
-    '설교나눔: 주일예배 요약 및 적용 작성',
+    '설교나눔: 주일예배 및 수요예배 요약/적용 작성',
     '「하나님 앞에서」 신앙점검표 작성',
-    '성경구절 암송',
-    '순 모임 참석',
   ];
 
   if (section === '다니엘 프로젝트') {
@@ -56,15 +54,12 @@ const getCommonAssignmentItems = (section?: string) => {
       '기도: 매일 1시간',
       '새벽기도: 주 4회 이상 참석',
       '주만나 QT: 주 5회 이상',
-      '설교나눔: 주일예배 요약 및 적용 작성',
+      '설교나눔: 주일예배 및 수요예배 요약/적용 작성',
       '「하나님 앞에서」 신앙점검표 작성',
     ];
   }
 
-  return [
-    ...baseItems,
-    '수요예배 설교 요약 및 적용 작성',
-  ];
+  return baseItems;
 };
 
 const App: React.FC = () => {
@@ -535,29 +530,6 @@ const App: React.FC = () => {
               </button>
 
               {autoSubmissionWeeks.length > 0 && (
-                <div className="mt-4 rounded-xl border-2 border-emerald-100 bg-emerald-50 p-4 text-left">
-                  <div className="flex items-start gap-3">
-                    <div className="mt-0.5 rounded-lg bg-white p-2 text-emerald-700 shadow-sm shrink-0">
-                      <ClipboardCheck size={18} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-bold uppercase text-emerald-700">
-                        공통 과제
-                      </p>
-                      <ul className="mt-2 space-y-1.5">
-                        {commonAssignmentItems.map((item) => (
-                          <li key={item} className="flex gap-2 text-sm leading-relaxed text-slate-700">
-                            <span className="mt-2 h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
-                            <span>{item}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {autoSubmissionWeeks.length > 0 && (
                 <div className="mt-4 rounded-xl border-2 border-blue-100 bg-blue-50 p-4 text-left">
                   <div className="flex items-start gap-3">
                     <div className="mt-0.5 rounded-lg bg-white p-2 text-blue-600 shadow-sm shrink-0">
@@ -586,6 +558,29 @@ const App: React.FC = () => {
                           </div>
                         ))}
                       </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {autoSubmissionWeeks.length > 0 && (
+                <div className="mt-4 rounded-xl border-2 border-emerald-100 bg-emerald-50 p-4 text-left">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 rounded-lg bg-white p-2 text-emerald-700 shadow-sm shrink-0">
+                      <ClipboardCheck size={18} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold uppercase text-emerald-700">
+                        공통 과제
+                      </p>
+                      <ul className="mt-2 space-y-1.5">
+                        {commonAssignmentItems.map((item) => (
+                          <li key={item} className="flex gap-2 text-sm leading-relaxed text-slate-700">
+                            <span className="mt-2 h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   </div>
                 </div>
