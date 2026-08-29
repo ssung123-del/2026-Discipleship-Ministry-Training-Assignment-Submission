@@ -424,34 +424,6 @@ const App: React.FC = () => {
                   </svg>
                 </div>
               </div>
-
-              {selectedWeek && (
-                <div className="mt-4 rounded-xl border-2 border-blue-100 bg-blue-50 p-4 text-left">
-                  <div className="flex items-start gap-3">
-                    <div className="mt-0.5 rounded-lg bg-white p-2 text-blue-600 shadow-sm shrink-0">
-                      <ListChecks size={18} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-bold uppercase text-blue-700">
-                        과제 목록
-                      </p>
-                      <p className="text-sm font-bold text-blue-950 leading-snug">
-                        {selectedWeek.topic || selectedWeek.label}
-                      </p>
-                      {selectedWeek.assignmentItems && selectedWeek.assignmentItems.length > 0 && (
-                        <ul className="mt-2 space-y-1.5">
-                          {selectedWeek.assignmentItems.map((item) => (
-                            <li key={item} className="flex gap-2 text-sm leading-relaxed text-slate-700">
-                              <span className="mt-2 h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
-                              <span>{item}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Step 3: File */}
@@ -550,6 +522,34 @@ const App: React.FC = () => {
               >
                 {submission.files.length > 0 ? `${submission.files.length}개 파일 제출하기` : '과제 제출하기'}
               </button>
+
+              {selectedWeek && (
+                <div className="mt-4 rounded-xl border-2 border-blue-100 bg-blue-50 p-4 text-left">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 rounded-lg bg-white p-2 text-blue-600 shadow-sm shrink-0">
+                      <ListChecks size={18} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold uppercase text-blue-700">
+                        과제 목록
+                      </p>
+                      <p className="text-sm font-bold text-blue-950 leading-snug">
+                        {selectedWeek.topic || selectedWeek.label}
+                      </p>
+                      {selectedWeek.assignmentItems && selectedWeek.assignmentItems.length > 0 && (
+                        <ul className="mt-2 space-y-1.5">
+                          {selectedWeek.assignmentItems.map((item) => (
+                            <li key={item} className="flex gap-2 text-sm leading-relaxed text-slate-700">
+                              <span className="mt-2 h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </form>
         </div>
