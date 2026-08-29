@@ -15,6 +15,13 @@ const ENCOURAGEMENT_MESSAGES = [
   "작은 순종이 모여 큰 기적을 이룹니다. 훈련생님을 축복합니다!"
 ];
 
+const formatLocalDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const App: React.FC = () => {
   const [submission, setSubmission] = useState<TraineeSubmission>({
     name: '',
@@ -31,27 +38,21 @@ const App: React.FC = () => {
   // --- Calculate Current Week ---
   const currentWeekLabel = useMemo(() => {
     const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
+    const todayStr = formatLocalDate(today);
 
     // Find the latest week that has started
     const validWeeks = TRAINING_WEEKS.filter(w => w.startDate);
-    
-    // Logic update: The week label switches on MONDAY, not Sunday.
-    // Sunday is considered the deadline for the previous week's homework.
-    // We look for a week where startDate is strictly BEFORE today (startDate < today).
-    // Example: Week 1 starts 2/1 (Sun).
-    // On 2/1: 2/1 < 2/1 is False. It falls back to OT (User wants "OT period" until 2/1).
-    // On 2/2: 2/1 < 2/2 is True. It becomes Week 1.
-    let currentWeek = [...validWeeks].reverse().find(w => w.startDate! < todayStr);
-    
-    // Edge case: The very first day of training (e.g., 1/25 OT Start).
-    // On 1/25: 1/25 < 1/25 is false, so it returns null.
-    // We must explicitly allow the first day to show the first week.
-    if (!currentWeek && validWeeks.length > 0 && validWeeks[0].startDate === todayStr) {
-      currentWeek = validWeeks[0];
-    }
-    
-    return currentWeek ? currentWeek.label.split('(')[0].trim() : null;
+
+    const latestStartDate = validWeeks.reduce<string | null>((latest, week) => {
+      if (!week.startDate || week.startDate > todayStr) return latest;
+      if (!latest || week.startDate > latest) return week.startDate;
+      return latest;
+    }, null);
+
+    if (!latestStartDate) return null;
+
+    const currentWeeks = validWeeks.filter(w => w.startDate === latestStartDate);
+    return currentWeeks.map(w => w.label.split('(')[0].trim()).join(' / ');
   }, []);
 
   // --- Image Compression Utility ---
