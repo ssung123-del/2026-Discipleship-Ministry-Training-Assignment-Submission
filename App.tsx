@@ -3,7 +3,7 @@ import { Header } from './components/Header';
 import { StatusModal } from './components/StatusModal';
 import { TRAINING_WEEKS, MAX_FILE_SIZE_MB, GOOGLE_SCRIPT_URL } from './constants';
 import { TraineeSubmission, UploadStatus, FeedbackResponse } from './types';
-import { UploadCloud, File as FileIcon, User, X, AlertTriangle, Clock, ListChecks } from 'lucide-react';
+import { UploadCloud, File as FileIcon, User, X, AlertTriangle, Clock, ListChecks, ClipboardCheck } from 'lucide-react';
 
 // Recommended encouragement messages list
 const ENCOURAGEMENT_MESSAGES = [
@@ -20,6 +20,51 @@ const formatLocalDate = (date: Date) => {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+};
+
+const getCommonAssignmentItems = (section?: string) => {
+  const baseItems = [
+    '기도: 매일 1시간',
+    '새벽기도: 주 4회 이상 참석',
+    '주만나 QT: 주 5회 이상',
+    '교재 예습',
+    '설교나눔: 주일예배 요약 및 적용 작성',
+    '「하나님 앞에서」 신앙점검표 작성',
+    '성경구절 암송',
+    '순 모임 참석',
+  ];
+
+  if (section === '다니엘 프로젝트') {
+    return [
+      '다니엘기도회 참석',
+      '새벽예배 참석은 자유롭게',
+      '다니엘기도회 매일 말씀 요약 및 적용',
+      '『다니엘프로젝트 HOLY HABIT MOVEMENT』 21일 묵상 및 단톡방 제출',
+      '독후감: 다니엘 프로젝트',
+    ];
+  }
+
+  if (section === '교회론 코칭') {
+    return [
+      ...baseItems,
+      '담임목사님 교회론 강의 요약 및 적용',
+    ];
+  }
+
+  if (section === '휴강') {
+    return [
+      '기도: 매일 1시간',
+      '새벽기도: 주 4회 이상 참석',
+      '주만나 QT: 주 5회 이상',
+      '설교나눔: 주일예배 요약 및 적용 작성',
+      '「하나님 앞에서」 신앙점검표 작성',
+    ];
+  }
+
+  return [
+    ...baseItems,
+    '수요예배 설교 요약 및 적용 작성',
+  ];
 };
 
 const App: React.FC = () => {
@@ -332,6 +377,7 @@ const App: React.FC = () => {
   const selectedWeek = autoSubmissionWeeks[0];
   const autoWeekLabel = autoSubmissionWeeks.map(w => w.label.split('(')[0].trim()).join(' / ');
   const autoWeekDueDate = selectedWeek?.label.match(/\(([^)]+)\)/)?.[1];
+  const commonAssignmentItems = getCommonAssignmentItems(selectedWeek?.section);
 
   const isFormValid = submission.name.length > 0 && autoSubmissionWeeks.length > 0 && submission.files.length > 0;
 
@@ -487,6 +533,29 @@ const App: React.FC = () => {
               >
                 {submission.files.length > 0 ? `${submission.files.length}개 파일 제출하기` : '과제 제출하기'}
               </button>
+
+              {autoSubmissionWeeks.length > 0 && (
+                <div className="mt-4 rounded-xl border-2 border-emerald-100 bg-emerald-50 p-4 text-left">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 rounded-lg bg-white p-2 text-emerald-700 shadow-sm shrink-0">
+                      <ClipboardCheck size={18} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold uppercase text-emerald-700">
+                        공통 과제
+                      </p>
+                      <ul className="mt-2 space-y-1.5">
+                        {commonAssignmentItems.map((item) => (
+                          <li key={item} className="flex gap-2 text-sm leading-relaxed text-slate-700">
+                            <span className="mt-2 h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {autoSubmissionWeeks.length > 0 && (
                 <div className="mt-4 rounded-xl border-2 border-blue-100 bg-blue-50 p-4 text-left">
