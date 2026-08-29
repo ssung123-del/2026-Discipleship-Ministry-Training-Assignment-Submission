@@ -70,6 +70,7 @@ const App: React.FC = () => {
   const [status, setStatus] = useState<UploadStatus>(UploadStatus.IDLE);
   const [feedback, setFeedback] = useState<FeedbackResponse | null>(null);
   const [progress, setProgress] = useState<number>(0);
+  const [fileNotice, setFileNotice] = useState<string | null>(null);
 
   // Use refs to track progress across async operations
   const progressMapRef = useRef<number[]>([]);
@@ -164,10 +165,11 @@ const App: React.FC = () => {
     if (e.target.files && e.target.files.length > 0) {
       const newFiles = Array.from(e.target.files) as File[];
       const validFiles: File[] = [];
+      const notices: string[] = [];
 
       newFiles.forEach(file => {
         if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
-          alert(`'${file.name}' 파일 크기가 ${MAX_FILE_SIZE_MB}MB를 초과하여 제외되었습니다.`);
+          notices.push(`'${file.name}' 파일은 ${MAX_FILE_SIZE_MB}MB를 초과해 제외되었습니다.`);
           return;
         }
 
@@ -182,7 +184,7 @@ const App: React.FC = () => {
         );
 
         if (isDuplicate) {
-          alert(`'${file.name}'은(는) 이미 목록에 추가된 파일입니다.`);
+          notices.push(`'${file.name}'은(는) 이미 추가된 파일입니다.`);
           return;
         }
 
@@ -192,6 +194,8 @@ const App: React.FC = () => {
       if (validFiles.length > 0) {
         setSubmission((prev) => ({ ...prev, files: [...prev.files, ...validFiles] }));
       }
+
+      setFileNotice(notices.length > 0 ? notices.join(' ') : null);
       
       e.target.value = '';
     }
@@ -202,10 +206,11 @@ const App: React.FC = () => {
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const newFiles = Array.from(e.dataTransfer.files) as File[];
       const validFiles: File[] = [];
+      const notices: string[] = [];
 
       newFiles.forEach(file => {
         if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
-           alert(`'${file.name}' 파일 크기가 ${MAX_FILE_SIZE_MB}MB를 초과하여 제외되었습니다.`);
+           notices.push(`'${file.name}' 파일은 ${MAX_FILE_SIZE_MB}MB를 초과해 제외되었습니다.`);
            return;
         }
 
@@ -220,7 +225,7 @@ const App: React.FC = () => {
         );
 
         if (isDuplicate) {
-          alert(`'${file.name}'은(는) 이미 목록에 추가된 파일입니다.`);
+          notices.push(`'${file.name}'은(는) 이미 추가된 파일입니다.`);
           return;
         }
 
@@ -230,6 +235,8 @@ const App: React.FC = () => {
       if (validFiles.length > 0) {
         setSubmission((prev) => ({ ...prev, files: [...prev.files, ...validFiles] }));
       }
+
+      setFileNotice(notices.length > 0 ? notices.join(' ') : null);
     }
   };
 
@@ -360,6 +367,7 @@ const App: React.FC = () => {
     setStatus(UploadStatus.IDLE);
     setFeedback(null);
     setProgress(0);
+    setFileNotice(null);
   };
 
   const resetFilesOnly = () => {
@@ -367,6 +375,7 @@ const App: React.FC = () => {
     setStatus(UploadStatus.IDLE);
     setFeedback(null);
     setProgress(0);
+    setFileNotice(null);
   };
 
   const selectedWeek = autoSubmissionWeeks[0];
@@ -385,7 +394,7 @@ const App: React.FC = () => {
         <div className="bg-white rounded-2xl shadow-lg border-2 border-slate-200 p-5 md:p-6">
           <div className="mb-6 text-center">
              <h2 className="text-xl font-bold text-gray-900">과제 제출하기</h2>
-             <p className="text-sm text-slate-600 mt-1 font-medium">이름을 입력하고 파일을 올려주세요.</p>
+             <p className="text-sm text-slate-600 mt-1 font-medium">이번 주 과제를 확인하고 파일을 올려주세요.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -437,7 +446,7 @@ const App: React.FC = () => {
               <label className="block text-base font-bold text-gray-900">
                 3. 과제 파일을 올려주세요
                 <span className="block text-xs font-normal text-slate-500 mt-1">
-                  D형큐티, 설교나눔, 독후감 등을 올려주세요. (여러 파일 가능)
+                  이번 주 제출 파일을 한 번에 여러 개 올릴 수 있습니다.
                 </span>
               </label>
               
@@ -469,6 +478,12 @@ const App: React.FC = () => {
                   </div>
                 </div>
               </div>
+
+              {fileNotice && (
+                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium leading-relaxed text-amber-900">
+                  {fileNotice}
+                </div>
+              )}
 
               {/* File List */}
               {submission.files.length > 0 && (
@@ -537,7 +552,7 @@ const App: React.FC = () => {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-bold uppercase text-blue-700">
-                        과제 목록
+                        이번 주 제출할 과제
                       </p>
                       <div className="mt-1 space-y-3">
                         {autoSubmissionWeeks.map((week) => (
@@ -571,7 +586,7 @@ const App: React.FC = () => {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-bold uppercase text-emerald-700">
-                        공통 과제
+                        매주 확인할 과제
                       </p>
                       <ul className="mt-2 space-y-1.5">
                         {commonAssignmentItems.map((item) => (
@@ -595,6 +610,7 @@ const App: React.FC = () => {
         feedback={feedback}
         files={submission.files}
         progress={progress}
+        weekLabel={autoWeekLabel}
         onReset={resetFormFull}
         onContinue={resetFilesOnly}
       />

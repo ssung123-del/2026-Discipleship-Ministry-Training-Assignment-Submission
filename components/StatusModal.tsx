@@ -7,11 +7,12 @@ interface StatusModalProps {
   feedback: FeedbackResponse | null;
   files?: File[];
   progress: number;
+  weekLabel?: string;
   onReset: () => void; // Completely reset (Close)
   onContinue: () => void; // Keep info, clear files (Upload More)
 }
 
-export const StatusModal: React.FC<StatusModalProps> = ({ status, feedback, files, progress, onReset, onContinue }) => {
+export const StatusModal: React.FC<StatusModalProps> = ({ status, feedback, files, progress, weekLabel, onReset, onContinue }) => {
   if (status === UploadStatus.IDLE) return null;
 
   return (
@@ -54,7 +55,12 @@ export const StatusModal: React.FC<StatusModalProps> = ({ status, feedback, file
               <CheckCircle2 size={48} />
             </div>
             <h3 className="text-3xl font-bold text-gray-900 mb-3">제출 완료!</h3>
-             <p className="text-xl text-slate-600 mb-8 font-medium">총 <span className="text-blue-600 font-bold">{files?.length || 1}개</span>의 파일이 잘 전송되었습니다.</p>
+             <p className="text-xl text-slate-600 mb-2 font-medium">총 <span className="text-blue-600 font-bold">{files?.length || 1}개</span>의 파일이 잘 전송되었습니다.</p>
+             {weekLabel && (
+              <p className="mb-8 rounded-full bg-blue-50 px-4 py-2 text-base font-bold text-blue-700">
+                {weekLabel} 과제로 접수되었습니다.
+              </p>
+             )}
             
             <div className="bg-slate-50 rounded-2xl p-6 mb-8 border-2 border-slate-200 text-left">
               {/* File List */}
