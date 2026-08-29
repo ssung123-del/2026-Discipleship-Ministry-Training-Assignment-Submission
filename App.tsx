@@ -3,7 +3,7 @@ import { Header } from './components/Header';
 import { StatusModal } from './components/StatusModal';
 import { TRAINING_WEEKS, MAX_FILE_SIZE_MB, GOOGLE_SCRIPT_URL } from './constants';
 import { TraineeSubmission, UploadStatus, FeedbackResponse } from './types';
-import { UploadCloud, File as FileIcon, User, Calendar, X, AlertTriangle, Clock } from 'lucide-react';
+import { UploadCloud, File as FileIcon, User, Calendar, X, AlertTriangle, Clock, ListChecks } from 'lucide-react';
 
 // Recommended encouragement messages list
 const ENCOURAGEMENT_MESSAGES = [
@@ -342,6 +342,8 @@ const App: React.FC = () => {
     return acc;
   }, {} as Record<string, typeof TRAINING_WEEKS>);
 
+  const selectedWeek = TRAINING_WEEKS.find(w => w.id === submission.weekId);
+
   const isFormValid = submission.name.length > 0 && submission.weekId.length > 0 && submission.files.length > 0;
 
   return (
@@ -422,6 +424,31 @@ const App: React.FC = () => {
                   </svg>
                 </div>
               </div>
+
+              {selectedWeek && (
+                <div className="mt-3 rounded-xl border-2 border-blue-100 bg-blue-50 p-4 text-left">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 rounded-lg bg-white p-2 text-blue-600 shadow-sm shrink-0">
+                      <ListChecks size={18} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-blue-950 leading-snug">
+                        {selectedWeek.topic || selectedWeek.label}
+                      </p>
+                      {selectedWeek.assignmentItems && selectedWeek.assignmentItems.length > 0 && (
+                        <ul className="mt-2 space-y-1.5">
+                          {selectedWeek.assignmentItems.map((item) => (
+                            <li key={item} className="flex gap-2 text-sm leading-relaxed text-slate-700">
+                              <span className="mt-2 h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Step 3: File */}
