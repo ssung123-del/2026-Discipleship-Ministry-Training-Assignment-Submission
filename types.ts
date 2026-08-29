@@ -8,7 +8,6 @@ export enum UploadStatus {
 
 export interface TraineeSubmission {
   name: string;
-  weekId: string;
   files: File[];
 }
 

@@ -3,7 +3,7 @@ import { Header } from './components/Header';
 import { StatusModal } from './components/StatusModal';
 import { TRAINING_WEEKS, MAX_FILE_SIZE_MB, GOOGLE_SCRIPT_URL } from './constants';
 import { TraineeSubmission, UploadStatus, FeedbackResponse } from './types';
-import { UploadCloud, File as FileIcon, User, Calendar, X, AlertTriangle, Clock, ListChecks } from 'lucide-react';
+import { UploadCloud, File as FileIcon, User, X, AlertTriangle, Clock, ListChecks } from 'lucide-react';
 
 // Recommended encouragement messages list
 const ENCOURAGEMENT_MESSAGES = [
@@ -25,7 +25,6 @@ const formatLocalDate = (date: Date) => {
 const App: React.FC = () => {
   const [submission, setSubmission] = useState<TraineeSubmission>({
     name: '',
-    weekId: '',
     files: [],
   });
   const [status, setStatus] = useState<UploadStatus>(UploadStatus.IDLE);
@@ -35,24 +34,19 @@ const App: React.FC = () => {
   // Use refs to track progress across async operations
   const progressMapRef = useRef<number[]>([]);
 
-  // --- Calculate Current Week ---
-  const currentWeekLabel = useMemo(() => {
+  // --- Calculate Current Submission Week ---
+  const autoSubmissionWeeks = useMemo(() => {
     const today = new Date();
     const todayStr = formatLocalDate(today);
 
-    // Find the latest week that has started
-    const validWeeks = TRAINING_WEEKS.filter(w => w.startDate);
+    const assignmentWeeks = TRAINING_WEEKS
+      .filter(w => w.id.startsWith('week-') && w.startDate)
+      .sort((a, b) => a.startDate!.localeCompare(b.startDate!));
 
-    const latestStartDate = validWeeks.reduce<string | null>((latest, week) => {
-      if (!week.startDate || week.startDate > todayStr) return latest;
-      if (!latest || week.startDate > latest) return week.startDate;
-      return latest;
-    }, null);
+    const nextDueDate = assignmentWeeks.find(w => w.startDate! >= todayStr)?.startDate;
+    if (!nextDueDate) return [];
 
-    if (!latestStartDate) return null;
-
-    const currentWeeks = validWeeks.filter(w => w.startDate === latestStartDate);
-    return currentWeeks.map(w => w.label.split('(')[0].trim()).join(' / ');
+    return assignmentWeeks.filter(w => w.startDate === nextDueDate);
   }, []);
 
   // --- Image Compression Utility ---
@@ -226,7 +220,7 @@ const App: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!submission.name || !submission.weekId || submission.files.length === 0) return;
+    if (!submission.name || autoSubmissionWeeks.length === 0 || submission.files.length === 0) return;
 
     if (!GOOGLE_SCRIPT_URL) {
       alert("관리자 설정 오류: Google Script URL이 설정되지 않았습니다. constants.ts 파일을 확인해주세요.");
@@ -251,7 +245,7 @@ const App: React.FC = () => {
     };
 
     try {
-      const weekLabel = TRAINING_WEEKS.find(w => w.id === submission.weekId)?.label || 'Unknown';
+      const weekLabel = autoSubmissionWeeks.map(w => w.label).join(' / ');
       
       const uploadSingleFile = async (originalFile: File, index: number) => {
         // 1. Compress Image
@@ -322,7 +316,7 @@ const App: React.FC = () => {
   };
 
   const resetFormFull = () => {
-    setSubmission({ name: '', weekId: '', files: [] });
+    setSubmission({ name: '', files: [] });
     setStatus(UploadStatus.IDLE);
     setFeedback(null);
     setProgress(0);
@@ -335,16 +329,11 @@ const App: React.FC = () => {
     setProgress(0);
   };
 
-  const weeksBySection = TRAINING_WEEKS.reduce((acc, week) => {
-    const section = week.section || '기타';
-    if (!acc[section]) acc[section] = [];
-    acc[section].push(week);
-    return acc;
-  }, {} as Record<string, typeof TRAINING_WEEKS>);
+  const selectedWeek = autoSubmissionWeeks[0];
+  const autoWeekLabel = autoSubmissionWeeks.map(w => w.label.split('(')[0].trim()).join(' / ');
+  const autoWeekDueDate = selectedWeek?.label.match(/\(([^)]+)\)/)?.[1];
 
-  const selectedWeek = TRAINING_WEEKS.find(w => w.id === submission.weekId);
-
-  const isFormValid = submission.name.length > 0 && submission.weekId.length > 0 && submission.files.length > 0;
+  const isFormValid = submission.name.length > 0 && autoSubmissionWeeks.length > 0 && submission.files.length > 0;
 
   return (
     <div className="min-h-screen bg-slate-100 pb-20">
@@ -355,7 +344,7 @@ const App: React.FC = () => {
         <div className="bg-white rounded-2xl shadow-lg border-2 border-slate-200 p-5 md:p-6">
           <div className="mb-6 text-center">
              <h2 className="text-xl font-bold text-gray-900">과제 제출하기</h2>
-             <p className="text-sm text-slate-600 mt-1 font-medium">이름과 주차를 선택 후 파일을 올려주세요.</p>
+             <p className="text-sm text-slate-600 mt-1 font-medium">이름을 입력하고 파일을 올려주세요.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -382,46 +371,22 @@ const App: React.FC = () => {
             {/* Step 2: Context */}
             <div className="space-y-1">
               <label className="block text-base font-bold text-gray-900">
-                2. 몇 주차 과제인가요?
+                2. 현재 제출 주차
               </label>
               
-              <div className="bg-blue-50 border border-blue-100 rounded-lg p-2.5 flex items-center text-blue-800 mb-1.5">
-                <Clock size={16} className="mr-2 text-blue-600 shrink-0" />
-                <span className="font-medium text-sm">
-                   {currentWeekLabel ? (
-                     <>이번 주는 <span className="font-bold">{currentWeekLabel}</span> 기간입니다.</>
-                   ) : (
-                     <span>현재는 훈련 기간이 아닙니다.</span>
-                   )}
-                </span>
-              </div>
-
-              <div className="relative">
-                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-blue-600">
-                  <Calendar size={20} />
-                </div>
-                <select
-                  value={submission.weekId}
-                  onChange={(e) => setSubmission({ ...submission, weekId: e.target.value })}
-                  className="w-full pl-10 pr-10 py-3 rounded-xl border-2 border-slate-300 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 transition-all outline-none bg-white text-base text-gray-900 appearance-none cursor-pointer shadow-sm"
-                >
-                  <option value="" disabled className="text-slate-400">눌러서 주차를 선택하세요</option>
-                  
-                  {Object.entries(weeksBySection).map(([section, weeks]) => (
-                    <optgroup key={section} label={section} className="font-bold text-slate-900 bg-slate-50">
-                      {weeks.map((week) => (
-                        <option key={week.id} value={week.id} className="py-2 bg-white font-normal text-gray-900">
-                          {week.label} {week.topic ? `- ${week.topic}` : ''}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                  
-                </select>
-                <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-slate-500">
-                  <svg className="h-5 w-5 fill-current" viewBox="0 0 20 20">
-                    <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
-                  </svg>
+              <div className="rounded-xl border-2 border-blue-100 bg-blue-50 p-3 flex items-start gap-3 text-blue-900">
+                <Clock size={20} className="mt-0.5 text-blue-600 shrink-0" />
+                <div className="min-w-0">
+                  {autoSubmissionWeeks.length > 0 ? (
+                    <>
+                      <p className="text-base font-bold leading-snug">{autoWeekLabel}</p>
+                      <p className="mt-1 text-sm font-medium text-blue-800">
+                        {autoWeekDueDate}까지 이 주차 과제를 제출할 수 있습니다.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm font-medium">현재 제출 가능한 사역훈련 과제가 없습니다.</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -523,7 +488,7 @@ const App: React.FC = () => {
                 {submission.files.length > 0 ? `${submission.files.length}개 파일 제출하기` : '과제 제출하기'}
               </button>
 
-              {selectedWeek && (
+              {autoSubmissionWeeks.length > 0 && (
                 <div className="mt-4 rounded-xl border-2 border-blue-100 bg-blue-50 p-4 text-left">
                   <div className="flex items-start gap-3">
                     <div className="mt-0.5 rounded-lg bg-white p-2 text-blue-600 shadow-sm shrink-0">
@@ -533,19 +498,25 @@ const App: React.FC = () => {
                       <p className="text-xs font-bold uppercase text-blue-700">
                         과제 목록
                       </p>
-                      <p className="text-sm font-bold text-blue-950 leading-snug">
-                        {selectedWeek.topic || selectedWeek.label}
-                      </p>
-                      {selectedWeek.assignmentItems && selectedWeek.assignmentItems.length > 0 && (
-                        <ul className="mt-2 space-y-1.5">
-                          {selectedWeek.assignmentItems.map((item) => (
-                            <li key={item} className="flex gap-2 text-sm leading-relaxed text-slate-700">
-                              <span className="mt-2 h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
-                              <span>{item}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
+                      <div className="mt-1 space-y-3">
+                        {autoSubmissionWeeks.map((week) => (
+                          <div key={week.id}>
+                            <p className="text-sm font-bold text-blue-950 leading-snug">
+                              {week.topic || week.label}
+                            </p>
+                            {week.assignmentItems && week.assignmentItems.length > 0 && (
+                              <ul className="mt-2 space-y-1.5">
+                                {week.assignmentItems.map((item) => (
+                                  <li key={item} className="flex gap-2 text-sm leading-relaxed text-slate-700">
+                                    <span className="mt-2 h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
+                                    <span>{item}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
