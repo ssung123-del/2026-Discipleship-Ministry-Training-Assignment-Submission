@@ -3,7 +3,7 @@ import { Header } from './components/Header';
 import { StatusModal } from './components/StatusModal';
 import { TRAINING_WEEKS, MAX_FILE_SIZE_MB, GOOGLE_SCRIPT_URL } from './constants';
 import { TraineeSubmission, UploadStatus, FeedbackResponse } from './types';
-import { UploadCloud, File as FileIcon, User, X, AlertTriangle, Clock, ListChecks, ClipboardCheck } from 'lucide-react';
+import { UploadCloud, File as FileIcon, User, X, AlertTriangle, ListChecks, ClipboardCheck } from 'lucide-react';
 
 // Recommended encouragement messages list
 const ENCOURAGEMENT_MESSAGES = [
@@ -22,13 +22,14 @@ const formatLocalDate = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
-const getCommonAssignmentItems = (section?: string) => {
+const uniqueItems = (items: string[]) => Array.from(new Set(items));
+
+const getReferenceAssignmentItems = (section?: string) => {
   const baseItems = [
     '기도: 매일 1시간',
     '새벽기도: 주 4회 이상 참석',
     '주만나 QT: 주 5회 이상',
     '교재 예습',
-    '설교나눔: 주일예배 및 수요예배 요약/적용 작성',
     '「하나님 앞에서」 신앙점검표 작성',
   ];
 
@@ -36,27 +37,13 @@ const getCommonAssignmentItems = (section?: string) => {
     return [
       '다니엘기도회 참석',
       '새벽예배 참석은 자유롭게',
-      '다니엘기도회 매일 말씀 요약 및 적용',
-      '『다니엘프로젝트 HOLY HABIT MOVEMENT』 21일 묵상 및 단톡방 제출',
-      '독후감: 다니엘 프로젝트',
-    ];
-  }
-
-  if (section === '교회론 코칭') {
-    return [
-      ...baseItems,
-      '담임목사님 교회론 강의 요약 및 적용',
+      '주만나 QT: 주 5회 이상',
+      '「하나님 앞에서」 신앙점검표 작성',
     ];
   }
 
   if (section === '휴강') {
-    return [
-      '기도: 매일 1시간',
-      '새벽기도: 주 4회 이상 참석',
-      '주만나 QT: 주 5회 이상',
-      '설교나눔: 주일예배 및 수요예배 요약/적용 작성',
-      '「하나님 앞에서」 신앙점검표 작성',
-    ];
+    return baseItems;
   }
 
   return baseItems;
@@ -81,7 +68,7 @@ const App: React.FC = () => {
     const todayStr = formatLocalDate(today);
 
     const assignmentWeeks = TRAINING_WEEKS
-      .filter(w => w.assignmentItems?.length && w.startDate)
+      .filter(w => (w.submitItems?.length || w.referenceItems?.length) && w.startDate)
       .sort((a, b) => a.startDate!.localeCompare(b.startDate!));
 
     const nextDueDate = assignmentWeeks.find(w => w.startDate! >= todayStr)?.startDate;
@@ -267,7 +254,7 @@ const App: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!submission.name || autoSubmissionWeeks.length === 0 || submission.files.length === 0) return;
+    if (!submission.name || submitItems.length === 0 || submission.files.length === 0) return;
 
     if (!GOOGLE_SCRIPT_URL) {
       alert("관리자 설정 오류: Google Script URL이 설정되지 않았습니다. constants.ts 파일을 확인해주세요.");
@@ -381,9 +368,13 @@ const App: React.FC = () => {
   const selectedWeek = autoSubmissionWeeks[0];
   const autoWeekLabel = autoSubmissionWeeks.map(w => w.label.split('(')[0].trim()).join(' / ');
   const autoWeekDueDate = selectedWeek?.label.match(/\(([^)]+)\)/)?.[1];
-  const commonAssignmentItems = getCommonAssignmentItems(selectedWeek?.section);
+  const submitItems = uniqueItems(autoSubmissionWeeks.flatMap(w => w.submitItems || []));
+  const referenceItems = uniqueItems([
+    ...autoSubmissionWeeks.flatMap(w => w.referenceItems || []),
+    ...getReferenceAssignmentItems(selectedWeek?.section),
+  ]);
 
-  const isFormValid = submission.name.length > 0 && autoSubmissionWeeks.length > 0 && submission.files.length > 0;
+  const isFormValid = submission.name.length > 0 && submitItems.length > 0 && submission.files.length > 0;
 
   return (
     <div className="min-h-screen bg-slate-100 pb-20">
@@ -393,8 +384,12 @@ const App: React.FC = () => {
         
         <div className="bg-white rounded-2xl shadow-lg border-2 border-slate-200 p-5 md:p-6">
           <div className="mb-6 text-center">
-             <h2 className="text-xl font-bold text-gray-900">과제 제출하기</h2>
-             <p className="text-sm text-slate-600 mt-1 font-medium">이번 주 과제를 확인하고 파일을 올려주세요.</p>
+             <h2 className="text-xl font-bold text-gray-900">
+               {autoWeekLabel ? `${autoWeekLabel} ${submitItems.length > 0 ? '과제 제출' : '과제 확인'}` : '과제 제출하기'}
+             </h2>
+             <p className="text-sm text-slate-600 mt-1 font-medium">
+               {submitItems.length > 0 ? '제출할 항목을 확인하고 파일을 올려주세요.' : '이번 주에 확인할 과제를 살펴보세요.'}
+             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -421,22 +416,49 @@ const App: React.FC = () => {
             {/* Step 2: Context */}
             <div className="space-y-1">
               <label className="block text-base font-bold text-gray-900">
-                2. 현재 제출 주차
+                2. 이번 주 제출할 것
               </label>
               
-              <div className="rounded-xl border-2 border-blue-100 bg-blue-50 p-3 flex items-start gap-3 text-blue-900">
-                <Clock size={20} className="mt-0.5 text-blue-600 shrink-0" />
-                <div className="min-w-0">
-                  {autoSubmissionWeeks.length > 0 ? (
-                    <>
-                      <p className="text-base font-bold leading-snug">{autoWeekLabel}</p>
-                      <p className="mt-1 text-sm font-medium text-blue-800">
-                        {autoWeekDueDate}까지 이 주차 과제를 제출할 수 있습니다.
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-sm font-medium">현재 제출 가능한 사역훈련 과제가 없습니다.</p>
-                  )}
+              <div className="rounded-xl border-2 border-blue-100 bg-blue-50 p-4 text-left">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 rounded-lg bg-white p-2 text-blue-600 shadow-sm shrink-0">
+                    <ListChecks size={18} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    {submitItems.length > 0 ? (
+                      <>
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                          <p className="text-sm font-bold text-blue-950 leading-snug">
+                            {autoSubmissionWeeks.map(w => w.topic || w.label).join(' / ')}
+                          </p>
+                          {autoWeekDueDate && (
+                            <span className="text-xs font-bold text-blue-700 shrink-0">
+                              {autoWeekDueDate}까지
+                            </span>
+                          )}
+                        </div>
+                        <ul className="mt-2 space-y-1.5">
+                          {submitItems.map((item) => (
+                            <li key={item} className="flex gap-2 text-sm leading-relaxed text-slate-700">
+                              <span className="mt-2 h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    ) : autoSubmissionWeeks.length > 0 ? (
+                      <>
+                        <p className="text-sm font-bold text-blue-950 leading-snug">
+                          {autoSubmissionWeeks.map(w => w.topic || w.label).join(' / ')}
+                        </p>
+                        <p className="mt-1 text-sm font-medium text-blue-800">
+                          이번 기간에는 온라인으로 제출할 파일이 없습니다.
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-sm font-medium text-blue-900">현재 제출 가능한 사역훈련 과제가 없습니다.</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -446,33 +468,41 @@ const App: React.FC = () => {
               <label className="block text-base font-bold text-gray-900">
                 3. 과제 파일을 올려주세요
                 <span className="block text-xs font-normal text-slate-500 mt-1">
-                  이번 주 제출 파일을 한 번에 여러 개 올릴 수 있습니다.
+                  {submitItems.length > 0 ? '이번 주 제출 파일을 한 번에 여러 개 올릴 수 있습니다.' : '이번 기간에는 올릴 제출 파일이 없습니다.'}
                 </span>
               </label>
               
               <div
                 onDragOver={(e) => e.preventDefault()}
-                onDrop={handleDrop}
-                className="relative group cursor-pointer"
+                onDrop={submitItems.length > 0 ? handleDrop : undefined}
+                className={`relative group ${submitItems.length > 0 ? 'cursor-pointer' : 'cursor-not-allowed'}`}
               >
-                <div className="border-3 border-dashed border-slate-400 rounded-xl p-6 text-center transition-all bg-slate-50 group-hover:bg-blue-50 group-hover:border-blue-500">
-                  <input
-                    type="file"
-                    multiple
-                    onChange={handleFileChange}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    accept="image/*,.pdf,.doc,.docx,.hwp"
-                  />
+                <div className={`border-3 border-dashed rounded-xl p-6 text-center transition-all ${
+                  submitItems.length > 0
+                    ? 'border-slate-400 bg-slate-50 group-hover:bg-blue-50 group-hover:border-blue-500'
+                    : 'border-slate-200 bg-slate-100'
+                }`}>
+                  {submitItems.length > 0 && (
+                    <input
+                      type="file"
+                      multiple
+                      onChange={handleFileChange}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      accept="image/*,.pdf,.doc,.docx,.hwp"
+                    />
+                  )}
                   <div className="flex flex-col items-center justify-center space-y-2">
-                    <div className="p-3 bg-white rounded-full shadow-md text-blue-600 group-hover:scale-110 transition-transform duration-300">
+                    <div className={`p-3 bg-white rounded-full shadow-md transition-transform duration-300 ${
+                      submitItems.length > 0 ? 'text-blue-600 group-hover:scale-110' : 'text-slate-400'
+                    }`}>
                       <UploadCloud size={32} />
                     </div>
                     <div className="space-y-0.5">
-                      <p className="text-base font-bold text-slate-800">
-                        여기를 눌러서 파일을 선택하세요
+                      <p className={`text-base font-bold ${submitItems.length > 0 ? 'text-slate-800' : 'text-slate-500'}`}>
+                        {submitItems.length > 0 ? '여기를 눌러서 파일을 선택하세요' : '이번 기간에는 파일 제출이 없습니다'}
                       </p>
                       <p className="text-xs text-slate-500">
-                        사진, PDF, 한글, 워드 파일 가능
+                        {submitItems.length > 0 ? '사진, PDF, 한글, 워드 파일 가능' : '아래 참고 과제만 확인해주세요'}
                       </p>
                     </div>
                   </div>
@@ -544,41 +574,7 @@ const App: React.FC = () => {
                 {submission.files.length > 0 ? `${submission.files.length}개 파일 제출하기` : '과제 제출하기'}
               </button>
 
-              {autoSubmissionWeeks.length > 0 && (
-                <div className="mt-4 rounded-xl border-2 border-blue-100 bg-blue-50 p-4 text-left">
-                  <div className="flex items-start gap-3">
-                    <div className="mt-0.5 rounded-lg bg-white p-2 text-blue-600 shadow-sm shrink-0">
-                      <ListChecks size={18} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-bold uppercase text-blue-700">
-                        이번 주 제출할 과제
-                      </p>
-                      <div className="mt-1 space-y-3">
-                        {autoSubmissionWeeks.map((week) => (
-                          <div key={week.id}>
-                            <p className="text-sm font-bold text-blue-950 leading-snug">
-                              {week.topic || week.label}
-                            </p>
-                            {week.assignmentItems && week.assignmentItems.length > 0 && (
-                              <ul className="mt-2 space-y-1.5">
-                                {week.assignmentItems.map((item) => (
-                                  <li key={item} className="flex gap-2 text-sm leading-relaxed text-slate-700">
-                                    <span className="mt-2 h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
-                                    <span>{item}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {autoSubmissionWeeks.length > 0 && (
+              {referenceItems.length > 0 && (
                 <div className="mt-4 rounded-xl border-2 border-emerald-100 bg-emerald-50 p-4 text-left">
                   <div className="flex items-start gap-3">
                     <div className="mt-0.5 rounded-lg bg-white p-2 text-emerald-700 shadow-sm shrink-0">
@@ -586,10 +582,10 @@ const App: React.FC = () => {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-bold uppercase text-emerald-700">
-                        매주 확인할 과제
+                        참고 과제
                       </p>
                       <ul className="mt-2 space-y-1.5">
-                        {commonAssignmentItems.map((item) => (
+                        {referenceItems.map((item) => (
                           <li key={item} className="flex gap-2 text-sm leading-relaxed text-slate-700">
                             <span className="mt-2 h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
                             <span>{item}</span>
