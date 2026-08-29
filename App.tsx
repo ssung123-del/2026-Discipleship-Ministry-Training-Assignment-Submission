@@ -426,12 +426,15 @@ const App: React.FC = () => {
               </div>
 
               {selectedWeek && (
-                <div className="mt-3 rounded-xl border-2 border-blue-100 bg-blue-50 p-4 text-left">
+                <div className="mt-4 rounded-xl border-2 border-blue-100 bg-blue-50 p-4 text-left">
                   <div className="flex items-start gap-3">
                     <div className="mt-0.5 rounded-lg bg-white p-2 text-blue-600 shadow-sm shrink-0">
                       <ListChecks size={18} />
                     </div>
                     <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold uppercase text-blue-700">
+                        과제 목록
+                      </p>
                       <p className="text-sm font-bold text-blue-950 leading-snug">
                         {selectedWeek.topic || selectedWeek.label}
                       </p>
