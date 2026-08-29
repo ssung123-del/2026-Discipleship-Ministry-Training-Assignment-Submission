@@ -13,7 +13,8 @@ export const TRAINING_WEEKS: WeekOption[] = [
   // 리더십 & 교리 코칭
   { id: 'week-1', label: '1주차 (9/6 주일)', topic: '1과 소그룹이란 무엇인가', assignmentItems: ['성경읽기: 창세기 1-25', 'D형큐티: 느 8:1-10', '암송: 시 57:1'], section: '리더십 & 교리 코칭', startDate: '2026-09-06' },
   { id: 'week-2', label: '2주차 (9/13 주일)', topic: '2과 소그룹 리더를 위한 리더십', assignmentItems: ['성경읽기: 창세기 26-50', 'D형큐티: 창 28:10-22', '암송: 요 10:14-15'], section: '리더십 & 교리 코칭', startDate: '2026-09-13' },
-  { id: 'week-3', label: '3주차 (9/20 주일)', topic: '3과 소그룹 인도법', assignmentItems: ['성경읽기: 요한복음, 로마서', 'D형큐티: 요 4:4-26', '암송: 약 1:19', '추석 휴강 포함'], section: '리더십 & 교리 코칭', startDate: '2026-09-20' },
+  { id: 'week-3', label: '3주차 (9/20 주일)', topic: '3과 소그룹 인도법', assignmentItems: ['성경읽기: 요한복음', 'D형큐티: 요 4:4-26', '암송: 약 1:19'], section: '리더십 & 교리 코칭', startDate: '2026-09-20' },
+  { id: 'holiday-chuseok', label: '추석 휴강 (9/27 주일)', topic: '주일반 추석 휴강', assignmentItems: ['성경읽기: 로마서'], section: '휴강', startDate: '2026-09-27' },
   { id: 'week-4', label: '4주차 (10/4 주일)', topic: '4과 칭의와 성화', assignmentItems: ['성경읽기: 고린도전서', 'D형큐티: 롬 6:1-4', '암송: 롬 3:25', '독후감: 사람들이 몰려오는 소그룹 인도법'], section: '리더십 & 교리 코칭', startDate: '2026-10-04' },
   { id: 'week-5', label: '5주차 (10/11 주일)', topic: '5과 세례와 성찬', assignmentItems: ['성경읽기: 고린도후서', 'D형큐티: 마 26:26-28', '암송: 요 6:53'], section: '리더십 & 교리 코칭', startDate: '2026-10-11' },
   { id: 'week-6', label: '6주차 (10/18 주일)', topic: '6과 예배와 찬양', assignmentItems: ['성경읽기: 갈, 엡, 빌, 골', 'D형큐티: 시 63:1-11', '암송: 딤전 6:16', '소그룹 실습 및 순장 평가서 제출'], section: '리더십 & 교리 코칭', startDate: '2026-10-18' },

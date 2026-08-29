@@ -40,7 +40,7 @@ const App: React.FC = () => {
     const todayStr = formatLocalDate(today);
 
     const assignmentWeeks = TRAINING_WEEKS
-      .filter(w => w.id.startsWith('week-') && w.startDate)
+      .filter(w => w.assignmentItems?.length && w.startDate)
       .sort((a, b) => a.startDate!.localeCompare(b.startDate!));
 
     const nextDueDate = assignmentWeeks.find(w => w.startDate! >= todayStr)?.startDate;
